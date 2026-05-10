@@ -1,919 +1,696 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>股票止盈止损价计算器</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #0a0c0f;
-    --surface: #111418;
-    --card: #161b22;
-    --border: #21262d;
-    --border-active: #30363d;
-    --text: #e6edf3;
-    --text-muted: #7d8590;
-    --text-dim: #484f58;
-    --profit: #f85149;
-    --profit-dim: rgba(248,81,73,0.12);
-    --loss: #3fb950;
-    --loss-dim: rgba(63,185,80,0.12);
-    --accent: #58a6ff;
-    --accent-dim: rgba(88,166,255,0.1);
-    --gold: #d4a84b;
-    --gold-dim: rgba(212,168,75,0.12);
-    --mono: 'JetBrains Mono', monospace;
-    --serif: 'Noto Serif SC', serif;
-  }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>历史股价数据查询</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --surface: #161920;
+      --surface2: #1e2230;
+      --border: #252a38;
+      --accent: #e8b84b;
+      --red: #f06464;
+      --green: #4fcf8a;
+      --blue: #5b9cf6;
+      --blue-dim: rgba(91,156,246,0.15);
+      --text: #e2e6f0;
+      --text-muted: #6b738a;
+      --text-dim: #9198ae;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans SC', sans-serif;
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+    /* ── Header ── */
+    header {
+      padding: 28px 20px 20px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #131620 0%, var(--bg) 100%);
+    }
+    .header-inner { max-width: 720px; margin: 0 auto; }
+    .logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .logo-dot {
+      width: 8px; height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent);
+    }
+    h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.04em; }
+    .subtitle { font-size: 12px; color: var(--text-muted); margin-left: 18px; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--mono);
-    min-height: 100vh;
-    padding: 24px 16px 56px;
-    position: relative;
-    overflow-x: hidden;
-  }
+    /* ── Panel ── */
+    .panel { max-width: 720px; margin: 24px auto 0; padding: 0 16px; }
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .input-label {
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-muted); margin-bottom: 10px;
+    }
 
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(88,166,255,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(88,166,255,0.025) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
+    /* Tags */
+    .tags-row {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 12px; min-height: 32px;
+    }
+    .tag {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px 4px 12px;
+      background: var(--blue-dim);
+      border: 1px solid rgba(91,156,246,0.3);
+      border-radius: 20px;
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--blue);
+      animation: tagIn 0.2s ease;
+    }
+    @keyframes tagIn {
+      from { opacity:0; transform:scale(0.85); }
+      to   { opacity:1; transform:scale(1); }
+    }
+    .tag-remove {
+      cursor: pointer; width: 16px; height: 16px;
+      border-radius: 50%; background: rgba(91,156,246,0.2);
+      border: none; color: var(--blue); font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; flex-shrink: 0;
+    }
+    .tag-remove:hover { background: rgba(240,100,100,0.3); color: var(--red); }
 
-  .container {
-    max-width: 680px;
-    margin: 0 auto;
-    position: relative;
-    z-index: 1;
-  }
+    /* Input row */
+    .input-row { display: flex; gap: 8px; }
+    input[type="text"] {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder {
+      color: var(--text-muted);
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 13px;
+    }
+    .btn-add {
+      padding: 10px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-dim);
+      font-size: 18px; line-height: 1;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-add:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* ── Header ── */
-  header {
-    text-align: center;
-    margin-bottom: 28px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--border);
-  }
+    .btn-query {
+      width: 100%; margin-top: 14px; padding: 13px;
+      background: var(--accent); color: #0d0f14;
+      border: none; border-radius: var(--radius-sm);
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 14px; font-weight: 700;
+      letter-spacing: 0.04em; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-query:hover { background: #f0c85a; transform: translateY(-1px); }
+    .btn-query:active { transform: translateY(0); }
+    .btn-query:disabled {
+      background: var(--surface2); color: var(--text-muted);
+      transform: none; cursor: not-allowed;
+    }
 
-  .header-tag {
-    display: inline-block;
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: var(--accent);
-    background: var(--accent-dim);
-    border: 1px solid rgba(88,166,255,0.22);
-    padding: 3px 10px;
-    border-radius: 2px;
-    margin-bottom: 12px;
-    text-transform: uppercase;
-  }
+    /* History */
+    .history-row {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+    }
+    .history-label { font-size: 11px; color: var(--text-muted); align-self: center; }
+    .history-chip {
+      padding: 3px 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .history-chip:hover { border-color: var(--accent); color: var(--accent); }
 
-  h1 {
-    font-family: var(--serif);
-    font-size: clamp(17px, 5vw, 23px);
-    font-weight: 700;
-    color: var(--text);
-    letter-spacing: 0.05em;
-    line-height: 1.4;
-  }
-  h1 span { color: var(--gold); }
+    /* Status */
+    .status-bar {
+      max-width: 720px; margin: 14px auto 0; padding: 0 16px;
+      font-size: 12px; color: var(--text-muted);
+      min-height: 18px; display: flex; align-items: center; gap: 8px;
+    }
+    .spinner {
+      width: 12px; height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .err-msg { color: var(--red); }
 
-  .subtitle {
-    font-size: 10px;
-    color: var(--text-dim);
-    margin-top: 6px;
-    letter-spacing: 0.12em;
-  }
+    /* Charts */
+    #charts {
+      max-width: 720px; margin: 20px auto 0;
+      padding: 0 16px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      animation: cardIn 0.35s ease both;
+    }
+    @keyframes cardIn {
+      from { opacity:0; transform:translateY(12px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .chart-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stock-name { font-size: 16px; font-weight: 700; }
+    .stock-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--text-muted); margin-top: 2px;
+    }
+    .badge-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .badge {
+      padding: 3px 8px; border-radius: 6px;
+      font-size: 11px; font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+    }
+    .badge-red   { background: rgba(240,100,100,0.15); color: var(--red); }
+    .badge-green { background: rgba(79,207,138,0.15);  color: var(--green); }
+    .badge-dim   { background: var(--surface2); color: var(--text-muted); }
 
-  /* ── Mode switcher ── */
-  .mode-switcher {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 4px;
-    margin-bottom: 20px;
-    gap: 4px;
-  }
+    .toggle-row {
+      display: flex; gap: 8px; padding: 12px 18px 0; flex-wrap: wrap;
+    }
+    .toggle-btn {
+      padding: 3px 10px; border-radius: 6px;
+      font-size: 11px; font-family: 'Noto Sans SC', sans-serif;
+      cursor: pointer; border: 1px solid var(--border);
+      background: transparent; color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .toggle-btn.active-max   { border-color: var(--red);   background: rgba(240,100,100,0.1); color: var(--red); }
+    .toggle-btn.active-min   { border-color: var(--green); background: rgba(79,207,138,0.1);  color: var(--green); }
+    .toggle-btn.active-close { border-color: var(--blue);  background: rgba(91,156,246,0.1);  color: var(--blue); }
 
-  .mode-btn {
-    padding: 10px 8px;
-    border: 1px solid transparent;
-    border-radius: 5px;
-    background: transparent;
-    color: var(--text-muted);
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    transition: all 0.18s;
-    text-align: center;
-    line-height: 1.5;
-  }
+    .chart-wrap { padding: 16px 12px 4px; position: relative; height: 240px; }
+    .chart-legend {
+      display: flex; gap: 16px; padding: 10px 18px 14px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+    .legend-dot  { width: 8px; height: 8px; border-radius: 50%; }
 
-  .mode-btn.active {
-    background: var(--card);
-    color: var(--text);
-    border-color: var(--border-active);
-    box-shadow: 0 1px 6px rgba(0,0,0,0.4);
-  }
+    .chart-error { padding: 40px 18px; text-align: center; color: var(--red); font-size: 13px; }
 
-  .mode-btn .mode-icon { font-size: 15px; display: block; margin-bottom: 2px; }
+    /* ── 数据表格 ── */
+    .table-section {
+      border-top: 1px solid var(--border);
+    }
+    .table-section-label {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 18px 0;
+      font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-muted);
+    }
+    .table-section-label::before {
+      content: '';
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .table-wrap {
+      overflow-x: auto;
+      padding: 10px 0 0;
+    }
 
-  /* ── Section ── */
-  .section {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 18px 20px;
-    margin-bottom: 14px;
-    transition: border-color 0.2s;
-  }
-  .section:focus-within { border-color: var(--border-active); }
+    table.price-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+    table.price-table thead {
+      position: sticky; top: 0; z-index: 1;
+      background: var(--surface2);
+    }
+    table.price-table th {
+      padding: 8px 14px;
+      text-align: right;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    table.price-table th:first-child { text-align: left; }
+    table.price-table td {
+      padding: 9px 14px;
+      text-align: right;
+      border-bottom: 1px solid rgba(37,42,56,0.6);
+      white-space: nowrap;
+      color: var(--text-dim);
+      transition: background 0.1s;
+    }
+    table.price-table td:first-child {
+      text-align: left;
+      color: var(--text-muted);
+    }
+    table.price-table tbody tr:last-child td { border-bottom: none; }
+    table.price-table tbody tr:hover td { background: rgba(255,255,255,0.025); }
 
-  .section-title {
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .section-title::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
-  }
+    /* 最新一行高亮 */
+    table.price-table tbody tr.latest td {
+      background: rgba(232,184,75,0.04);
+    }
+    table.price-table tbody tr.latest td:first-child {
+      color: var(--accent);
+      font-weight: 600;
+    }
 
-  /* ── Grid ── */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .td-max   { color: var(--red)   !important; }
+    .td-min   { color: var(--green) !important; }
+    .td-close { color: var(--blue)  !important; }
+    .td-vol   { color: var(--text-dim); }
 
-  @media (max-width: 440px) {
-    .grid-3 { grid-template-columns: 1fr 1fr; }
-  }
+    .td-pct-up   { color: var(--red)   !important; font-weight: 600; }
+    .td-pct-dn   { color: var(--green) !important; font-weight: 600; }
+    .td-pct-flat { color: var(--text-muted) !important; }
 
-  .field { display: flex; flex-direction: column; gap: 5px; }
-
-  label {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-  }
-
-  input[type="number"], select {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 9px 11px;
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 14px;
-    width: 100%;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    -moz-appearance: textfield;
-  }
-  input[type="number"]::-webkit-inner-spin-button,
-  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
-
-  input[type="number"]:focus, select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(88,166,255,0.1);
-  }
-
-  select {
-    cursor: pointer; appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237d8590' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    padding-right: 28px;
-  }
-  select option { background: var(--card); }
-
-  /* ── Toggle ── */
-  .toggle-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer; user-select: none;
-    transition: border-color 0.15s, background 0.15s;
-  }
-  .toggle-row:hover { border-color: var(--border-active); }
-  .toggle-row.active { border-color: var(--gold); background: var(--gold-dim); }
-
-  .toggle-check {
-    width: 16px; height: 16px;
-    border: 1.5px solid var(--border-active);
-    border-radius: 3px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: all 0.15s;
-  }
-  .toggle-row.active .toggle-check { background: var(--gold); border-color: var(--gold); }
-  .toggle-check svg { display: none; }
-  .toggle-row.active .toggle-check svg { display: block; }
-
-  .toggle-label { font-size: 12px; color: var(--text-muted); flex: 1; }
-  .toggle-row.active .toggle-label { color: var(--gold); }
-  .toggle-rate { font-size: 11px; color: var(--text-dim); }
-
-  /* ── Notice ── */
-  .notice {
-    font-size: 10px; color: var(--text-dim);
-    padding: 6px 10px;
-    border-left: 2px solid var(--border-active);
-    margin-top: 10px; line-height: 1.7; display: none;
-  }
-  .notice.show { display: block; }
-
-  /* ── Target hint ── */
-  .target-hint {
-    font-size: 10px; color: var(--text-dim);
-    margin-top: 8px; line-height: 1.7;
-  }
-
-  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
-  .dot-profit { background: var(--profit); }
-  .dot-loss   { background: var(--loss); }
-
-  .target-label {
-    font-size: 10px; letter-spacing: 0.08em;
-    display: flex; align-items: center; gap: 5px;
-  }
-
-  /* ── Button ── */
-  .btn-calc {
-    width: 100%; padding: 13px;
-    background: var(--accent); color: #0a0c0f;
-    border: none; border-radius: 6px;
-    font-family: var(--mono); font-size: 13px; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    cursor: pointer; transition: all 0.15s; margin-top: 2px;
-  }
-  .btn-calc:hover { background: #79b8ff; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(88,166,255,0.22); }
-  .btn-calc:active { transform: translateY(0); }
-
-  /* ── Error ── */
-  .error-msg {
-    background: rgba(248,81,73,0.08);
-    border: 1px solid rgba(248,81,73,0.25);
-    border-radius: 4px; padding: 9px 13px;
-    font-size: 12px; color: var(--loss);
-    display: none; margin-bottom: 12px;
-  }
-  .error-msg.show { display: block; }
-
-  /* ── Results ── */
-  .result-panel { display: none; animation: slideUp 0.28s ease; }
-  .result-panel.show { display: block; }
-
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* cost bar */
-  .cost-bar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 13px;
-    background: var(--surface); border-radius: 4px; margin-bottom: 7px;
-  }
-  .cost-bar:last-child { margin-bottom: 0; }
-  .cost-bar.cb-highlight {
-    background: var(--accent-dim);
-    border: 1px solid rgba(88,166,255,0.15);
-  }
-  .cb-label { font-size: 11px; color: var(--text-muted); }
-  .cb-value { font-size: 14px; font-weight: 600; color: var(--text); }
-  .cb-value.accent { color: var(--accent); }
-  .cb-value.muted  { color: var(--text-muted); }
-
-  /* result cards */
-  .result-cards {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 12px; margin-bottom: 14px;
-  }
-
-  .result-card {
-    border-radius: 6px; padding: 15px;
-    border: 1px solid; position: relative; overflow: hidden;
-  }
-  .result-card::before {
-    content: ''; position: absolute;
-    top: 0; left: 0; right: 0; height: 3px;
-  }
-  .result-card.profit  { background: var(--profit-dim); border-color: rgba(63,185,80,0.22); }
-  .result-card.profit::before  { background: var(--profit); }
-  .result-card.loss    { background: var(--loss-dim);   border-color: rgba(248,81,73,0.22); }
-  .result-card.loss::before    { background: var(--loss); }
-  .result-card.neutral { background: var(--surface);    border-color: var(--border-active); }
-  .result-card.neutral::before { background: var(--text-dim); }
-
-  .rc-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 7px; }
-  .result-card.profit  .rc-label { color: var(--profit); }
-  .result-card.loss    .rc-label { color: var(--loss); }
-  .result-card.neutral .rc-label { color: var(--text-muted); }
-
-  .rc-price { font-size: clamp(20px, 5vw, 26px); font-weight: 700; line-height: 1; margin-bottom: 5px; }
-  .result-card.profit  .rc-price { color: var(--profit); }
-  .result-card.loss    .rc-price { color: var(--loss); }
-  .result-card.neutral .rc-price { color: var(--text); }
-
-  .rc-meta { font-size: 11px; color: var(--text-muted); }
-
-  .rc-pct {
-    display: inline-block; margin-top: 5px;
-    padding: 2px 7px; border-radius: 3px;
-    font-size: 11px; font-weight: 600;
-  }
-  .result-card.profit  .rc-pct { background: rgba(63,185,80,0.15);  color: var(--profit); }
-  .result-card.loss    .rc-pct { background: rgba(248,81,73,0.15);   color: var(--loss); }
-  .result-card.neutral .rc-pct { background: var(--card);            color: var(--text-muted); }
-
-  /* rr */
-  .rr-bar {
-    padding: 11px 14px; background: var(--surface); border-radius: 4px;
-    border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
-  }
-  .rr-label  { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
-  .rr-value  { font-size: 18px; font-weight: 700; color: var(--gold); }
-  .rr-detail { font-size: 10px; color: var(--text-dim); text-align: right; }
-
-  /* pnl big */
-  .pnl-display {
-    text-align: center; padding: 22px 16px;
-    border-radius: 6px; border: 1px solid;
-    margin-bottom: 14px; position: relative; overflow: hidden;
-  }
-  .pnl-display::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-  }
-  .pnl-display.profit-state  { background: var(--profit-dim); border-color: rgba(63,185,80,0.3); }
-  .pnl-display.profit-state::before  { background: var(--profit); }
-  .pnl-display.loss-state    { background: var(--loss-dim);   border-color: rgba(248,81,73,0.3); }
-  .pnl-display.loss-state::before    { background: var(--loss); }
-  .pnl-display.neutral-state { background: var(--surface); border-color: var(--border-active); }
-  .pnl-display.neutral-state::before { background: var(--text-dim); }
-
-  .pnl-sign { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
-  .pnl-display.profit-state  .pnl-sign { color: var(--profit); }
-  .pnl-display.loss-state    .pnl-sign { color: var(--loss); }
-  .pnl-display.neutral-state .pnl-sign { color: var(--text-muted); }
-
-  .pnl-amount { font-size: clamp(28px, 8vw, 42px); font-weight: 700; line-height: 1; }
-  .pnl-display.profit-state  .pnl-amount { color: var(--profit); }
-  .pnl-display.loss-state    .pnl-amount { color: var(--loss); }
-  .pnl-display.neutral-state .pnl-amount { color: var(--text-muted); }
-
-  .pnl-sub { font-size: 11px; color: var(--text-muted); margin-top: 7px; }
-
-  /* fee table */
-  .fee-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .fee-table td { padding: 7px 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  .fee-table tr:last-child td { border-bottom: none; }
-  .fee-table td:first-child { color: var(--text-muted); }
-  .fee-table td:last-child  { text-align: right; color: var(--text); font-weight: 600; }
-  .fee-section-head td { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); padding-top: 12px; padding-bottom: 4px; border-bottom: none; }
-  .fee-total td { color: var(--text); font-weight: 700; border-top: 1px solid var(--border-active); border-bottom: none; padding-top: 10px; }
-  .fee-na { color: var(--text-dim) !important; font-weight: 400 !important; }
-
-  footer {
-    text-align: center; margin-top: 40px;
-    font-size: 10px; color: var(--text-dim);
-    letter-spacing: 0.08em; line-height: 1.9;
-  }
-</style>
+    /* 表格底部留白 */
+    .table-pad { height: 6px; }
+  </style>
 </head>
 <body>
-<div class="container">
 
-  <header>
-    <div class="header-tag">Short-term Trading</div>
-    <h1>股票<span>止盈止损价</span>计算器</h1>
-    <p class="subtitle">TAKE PROFIT · STOP LOSS · P&amp;L CALCULATOR</p>
-  </header>
-
-  <!-- 模式切换 -->
-  <div class="mode-switcher">
-    <button class="mode-btn active" id="btn-mode-tp" onclick="switchMode('tp')">
-      <span class="mode-icon">🎯</span>止盈止损价计算
-    </button>
-    <button class="mode-btn" id="btn-mode-pnl" onclick="switchMode('pnl')">
-      <span class="mode-icon">📊</span>盈亏计算
-    </button>
+<header>
+  <div class="header-inner">
+    <div class="logo-row">
+      <div class="logo-dot"></div>
+      <h1>股价区间走势</h1>
+    </div>
+    <div class="subtitle">最近 5～6 个交易日 · 最高价 / 最低价 / 收盘价</div>
   </div>
+</header>
 
-  <!-- ══════════════════════════════════════
-       模式A：止盈止损价计算
-  ══════════════════════════════════════ -->
-  <div id="panel-tp">
-
-    <div class="section">
-      <div class="section-title">基本参数</div>
-      <div class="grid-2">
-        <div class="field">
-          <label>买入价格（元/股）</label>
-          <input type="number" id="tp_buyPrice" placeholder="0.00" min="0.001" step="0.001">
-        </div>
-        <div class="field">
-          <label>买入数量（股）</label>
-          <input type="number" id="tp_buyQty" placeholder="100" min="1" step="1">
-        </div>
-      </div>
+<div class="panel">
+  <div class="input-card">
+    <div class="input-label">股票代码（最多 5 只）</div>
+    <div class="tags-row" id="tagsRow"></div>
+    <div class="input-row">
+      <input type="text" id="codeInput"
+        placeholder="输入6位代码后按 Enter 或点击 ＋，如 600519"
+        maxlength="8" />
+      <button class="btn-add" id="btnAdd" title="添加">＋</button>
     </div>
-
-    <div class="section">
-      <div class="section-title">手续费设置</div>
-      <div class="field" style="margin-bottom:12px;">
-        <label>交易类型</label>
-        <select id="tp_tradeType" onchange="tp_onTypeChange()">
-          <option value="a_stock">A股股票（佣金万0.854，最低5元）</option>
-          <option value="hk_connect">港股通（佣金万0.854，最低5元）</option>
-          <option value="etf">场内ETF（佣金万0.5，最低5元）</option>
-        </select>
-      </div>
-      <div class="notice" id="tp_hkNotice">
-        ⚠ 港股通仅含内地券商佣金（万0.854，最低5元），不含港交所收费、证监会征费、交收费等，请以实际交割为准。
-      </div>
-      <div class="toggle-row" id="tp_stampToggle" onclick="toggleStamp('tp')">
-        <div class="toggle-check">
-          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-            <path d="M1 4l3 3 5-6" stroke="#0a0c0f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <span class="toggle-label">印花税（卖出时收取）</span>
-        <span class="toggle-rate">万0.5 · 四舍五入2位</span>
-      </div>
+    <div class="history-row" id="historyRow" style="display:none">
+      <span class="history-label">最近</span>
     </div>
-
-    <div class="section">
-      <div class="section-title">目标设定</div>
-      <div class="grid-2">
-        <div class="field">
-          <label class="target-label"><span class="dot dot-profit"></span><span style="color:var(--profit)">止盈净盈利目标（元）</span></label>
-          <input type="number" id="tp_targetProfit" value="200" min="0" step="1">
-        </div>
-        <div class="field">
-          <label class="target-label"><span class="dot dot-loss"></span><span style="color:var(--loss)">止损毛亏损目标（元）</span></label>
-          <input type="number" id="tp_targetLoss" value="80" min="0" step="1">
-        </div>
-      </div>
-      <p class="target-hint">
-        止盈：卖出后扣除买卖全部手续费，净盈利 = 目标值<br>
-        止损：纯价差亏损（不含任何手续费），毛亏损 = 目标值
-      </p>
-    </div>
-
-    <div class="error-msg" id="tp_errorMsg"></div>
-    <button class="btn-calc" onclick="calcTP()">▶ 计算止盈止损价</button>
-
-    <div class="result-panel" id="tp_results" style="margin-top:16px;">
-
-      <div class="section">
-        <div class="section-title">买入成本</div>
-        <div class="cost-bar">
-          <span class="cb-label">买入金额</span>
-          <span class="cb-value" id="tp_r_buyAmt">—</span>
-        </div>
-        <div class="cost-bar">
-          <span class="cb-label">买入佣金</span>
-          <span class="cb-value muted" id="tp_r_buyCom">—</span>
-        </div>
-        <div class="cost-bar cb-highlight">
-          <span class="cb-label" style="color:var(--accent)">买入总成本</span>
-          <span class="cb-value accent" id="tp_r_buyCost">—</span>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">计算结果</div>
-        <div class="result-cards">
-          <div class="result-card profit">
-            <div class="rc-label">⬆ 止盈价</div>
-            <div class="rc-price" id="tp_r_tpPrice">—</div>
-            <div class="rc-meta" id="tp_r_tpMeta">—</div>
-            <div><span class="rc-pct" id="tp_r_tpPct">—</span></div>
-          </div>
-          <div class="result-card loss">
-            <div class="rc-label">⬇ 止损价</div>
-            <div class="rc-price" id="tp_r_slPrice">—</div>
-            <div class="rc-meta" id="tp_r_slMeta">—</div>
-            <div><span class="rc-pct" id="tp_r_slPct">—</span></div>
-          </div>
-        </div>
-        <div class="rr-bar">
-          <span class="rr-label">盈亏比 R : R</span>
-          <span class="rr-value" id="tp_r_rr">—</span>
-          <span class="rr-detail" id="tp_r_rrDetail">—</span>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">手续费明细</div>
-        <table class="fee-table"><tbody id="tp_feeBody"></tbody></table>
-      </div>
-
-    </div>
-  </div><!-- /panel-tp -->
-
-
-  <!-- ══════════════════════════════════════
-       模式B：盈亏计算
-  ══════════════════════════════════════ -->
-  <div id="panel-pnl" style="display:none;">
-
-    <div class="section">
-      <div class="section-title">持仓参数</div>
-      <div class="grid-3">
-        <div class="field">
-          <label>买入价（元/股）</label>
-          <input type="number" id="pnl_buyPrice" placeholder="0.00" min="0.001" step="0.001">
-        </div>
-        <div class="field">
-          <label>持仓数量（股）</label>
-          <input type="number" id="pnl_qty" placeholder="100" min="1" step="1">
-        </div>
-        <div class="field">
-          <label>当前价（元/股）</label>
-          <input type="number" id="pnl_curPrice" placeholder="0.00" min="0.001" step="0.001">
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">手续费设置</div>
-      <div class="field" style="margin-bottom:12px;">
-        <label>交易类型</label>
-        <select id="pnl_tradeType" onchange="pnl_onTypeChange()">
-          <option value="a_stock">A股股票（佣金万0.854，最低5元）</option>
-          <option value="hk_connect">港股通（佣金万0.854，最低5元）</option>
-          <option value="etf">场内ETF（佣金万0.5，最低5元）</option>
-        </select>
-      </div>
-      <div class="notice" id="pnl_hkNotice">
-        ⚠ 港股通仅含内地券商佣金，不含港交所收费、证监会征费等，请以实际交割为准。
-      </div>
-      <div class="toggle-row" id="pnl_stampToggle" onclick="toggleStamp('pnl')">
-        <div class="toggle-check">
-          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-            <path d="M1 4l3 3 5-6" stroke="#0a0c0f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <span class="toggle-label">印花税（按卖出时计入）</span>
-        <span class="toggle-rate">万0.5 · 四舍五入2位</span>
-      </div>
-    </div>
-
-    <div class="error-msg" id="pnl_errorMsg"></div>
-    <button class="btn-calc" onclick="calcPNL()">▶ 计算盈亏</button>
-
-    <div class="result-panel" id="pnl_results" style="margin-top:16px;">
-
-      <div class="pnl-display neutral-state" id="pnl_display">
-        <div class="pnl-sign" id="pnl_sign">—</div>
-        <div class="pnl-amount" id="pnl_amount">—</div>
-        <div class="pnl-sub" id="pnl_sub">净盈亏（扣除全部手续费后）</div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">持仓明细</div>
-        <div class="cost-bar">
-          <span class="cb-label">买入金额</span>
-          <span class="cb-value" id="pnl_r_buyAmt">—</span>
-        </div>
-        <div class="cost-bar">
-          <span class="cb-label">买入佣金</span>
-          <span class="cb-value muted" id="pnl_r_buyCom">—</span>
-        </div>
-        <div class="cost-bar cb-highlight">
-          <span class="cb-label" style="color:var(--accent)">持仓总成本</span>
-          <span class="cb-value accent" id="pnl_r_buyCost">—</span>
-        </div>
-        <div style="height:6px;"></div>
-        <div class="cost-bar">
-          <span class="cb-label">当前市值</span>
-          <span class="cb-value" id="pnl_r_curVal">—</span>
-        </div>
-        <div class="cost-bar">
-          <span class="cb-label">卖出佣金（按当前价估算）</span>
-          <span class="cb-value muted" id="pnl_r_sellCom">—</span>
-        </div>
-        <div class="cost-bar">
-          <span class="cb-label">印花税</span>
-          <span class="cb-value muted" id="pnl_r_stamp">—</span>
-        </div>
-        <div class="cost-bar">
-          <span class="cb-label">总手续费（买卖合计）</span>
-          <span class="cb-value muted" id="pnl_r_totalFee">—</span>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">盈亏拆分</div>
-        <div class="result-cards">
-          <div class="result-card neutral" id="pnl_rawCard">
-            <div class="rc-label">价差毛盈亏</div>
-            <div class="rc-price" id="pnl_r_rawPnl">—</div>
-            <div class="rc-meta">不含手续费</div>
-            <div><span class="rc-pct" id="pnl_r_rawPct">—</span></div>
-          </div>
-          <div class="result-card neutral" id="pnl_netCard">
-            <div class="rc-label">净盈亏</div>
-            <div class="rc-price" id="pnl_r_netPnl">—</div>
-            <div class="rc-meta">扣除全部手续费</div>
-            <div><span class="rc-pct" id="pnl_r_netPct">—</span></div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div><!-- /panel-pnl -->
-
-  <footer>
-    本工具仅供参考，不构成投资建议<br>
-    止盈止损应结合实际行情判断 · 交易有风险，入市需谨慎
-  </footer>
+    <button class="btn-query" id="btnQuery" disabled>查询走势</button>
+  </div>
 </div>
 
+<div class="status-bar" id="statusBar"></div>
+<div id="charts"></div>
+
 <script>
-// ──────────────────────────────────────────────────
-//  费率表（"万X" = X / 10000）
-//  万0.854 = 0.854 / 10000 = 0.0000854
-//  万0.5   = 0.5   / 10000 = 0.00005
-// ──────────────────────────────────────────────────
-const RATES = {
-  a_stock:    0.0000854,
-  hk_connect: 0.0000854,
-  etf:        0.00005
-};
-const MIN_COMM   = 5;       // 最低佣金（元）
-const STAMP_RATE = 0.0005; // 印花税：万0.5 = 0.5/10000 = 0.0005
+// ── 配置 ─────────────────────────────────────────────────
+const WORKER_URL = "https://stockhistory.ysq4006.workers.dev";
+const MAX = 5;
 
-// 印花税开关状态（按命名空间区分）
-const stamp = { tp: false, pnl: false };
+// ── 状态 ─────────────────────────────────────────────────
+let codes = [];
+const chartInstances = {};
 
-// ── 模式切换 ──────────────────────────────────────
-function switchMode(mode) {
-  document.getElementById('panel-tp').style.display  = mode === 'tp'  ? 'block' : 'none';
-  document.getElementById('panel-pnl').style.display = mode === 'pnl' ? 'block' : 'none';
-  document.getElementById('btn-mode-tp').classList.toggle('active',  mode === 'tp');
-  document.getElementById('btn-mode-pnl').classList.toggle('active', mode === 'pnl');
+// ── DOM ──────────────────────────────────────────────────
+const tagsRow   = document.getElementById("tagsRow");
+const codeInput = document.getElementById("codeInput");
+const btnAdd    = document.getElementById("btnAdd");
+const btnQuery  = document.getElementById("btnQuery");
+const statusBar = document.getElementById("statusBar");
+const chartsDiv = document.getElementById("charts");
+const historyRow = document.getElementById("historyRow");
+
+// ── 历史记录 ──────────────────────────────────────────────
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem("stockHistory") || "[]"); } catch { return []; }
+}
+function saveHistory(code) {
+  let h = loadHistory().filter(c => c !== code);
+  h.unshift(code);
+  localStorage.setItem("stockHistory", JSON.stringify(h.slice(0, 10)));
+}
+function renderHistory() {
+  const h = loadHistory();
+  if (!h.length) { historyRow.style.display = "none"; return; }
+  historyRow.style.display = "flex";
+  historyRow.querySelectorAll(".history-chip").forEach(c => c.remove());
+  h.forEach(code => {
+    const btn = document.createElement("button");
+    btn.className = "history-chip";
+    btn.textContent = code;
+    btn.onclick = () => addCode(code);
+    historyRow.appendChild(btn);
+  });
+}
+renderHistory();
+
+// ── Tag 管理 ──────────────────────────────────────────────
+function addCode(raw) {
+  const code = raw.trim();
+  if (!code) return;
+  if (!/^\d{6}$/.test(code)) { showStatus("股票代码应为 6 位数字", "err"); return; }
+  if (codes.includes(code))  { showStatus(`${code} 已在列表中`, "err"); return; }
+  if (codes.length >= MAX)   { showStatus(`最多添加 ${MAX} 只`, "err"); return; }
+  codes.push(code);
+  renderTags();
+  codeInput.value = "";
+  clearStatus();
+}
+function removeCode(code) {
+  codes = codes.filter(c => c !== code);
+  renderTags();
+}
+function renderTags() {
+  tagsRow.innerHTML = "";
+  codes.forEach(code => {
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.innerHTML = `${code}<button class="tag-remove" title="移除">✕</button>`;
+    tag.querySelector(".tag-remove").onclick = () => removeCode(code);
+    tagsRow.appendChild(tag);
+  });
+  btnQuery.disabled = codes.length === 0;
+  codeInput.disabled = codes.length >= MAX;
 }
 
-// ── 印花税开关 ─────────────────────────────────────
-function toggleStamp(ns) {
-  stamp[ns] = !stamp[ns];
-  document.getElementById(ns + '_stampToggle').classList.toggle('active', stamp[ns]);
+btnAdd.onclick = () => addCode(codeInput.value);
+codeInput.addEventListener("keydown", e => { if (e.key === "Enter") addCode(codeInput.value); });
+
+// ── 状态栏 ────────────────────────────────────────────────
+function showStatus(msg, type = "info") {
+  if (type === "loading") {
+    statusBar.innerHTML = `<div class="spinner"></div><span>${msg}</span>`;
+  } else if (type === "err") {
+    statusBar.innerHTML = `<span class="err-msg">⚠ ${msg}</span>`;
+  } else {
+    statusBar.textContent = msg;
+  }
 }
+function clearStatus() { statusBar.innerHTML = ""; }
 
-// ── 交易类型变化 ───────────────────────────────────
-function tp_onTypeChange() {
-  const t = document.getElementById('tp_tradeType').value;
-  document.getElementById('tp_hkNotice').classList.toggle('show', t === 'hk_connect');
-}
-function pnl_onTypeChange() {
-  const t = document.getElementById('pnl_tradeType').value;
-  document.getElementById('pnl_hkNotice').classList.toggle('show', t === 'hk_connect');
-}
+// ── 查询 ──────────────────────────────────────────────────
+btnQuery.addEventListener("click", async () => {
+  if (!codes.length) return;
+  btnQuery.disabled = true;
+  chartsDiv.innerHTML = "";
+  Object.values(chartInstances).forEach(c => c.instance?.destroy());
+  Object.keys(chartInstances).forEach(k => delete chartInstances[k]);
 
-// ──────────────────────────────────────────────────
-//  核心计算
-// ──────────────────────────────────────────────────
+  showStatus("正在获取数据…", "loading");
+  codes.forEach(saveHistory);
+  renderHistory();
 
-/**
- * 佣金 = max(金额 × 费率, 5)，四舍五入保留2位
- */
-function calcComm(amount, type) {
-  const raw = amount * RATES[type];
-  return Math.round(Math.max(raw, MIN_COMM) * 100) / 100;
-}
+  try {
+    const res = await fetch(`${WORKER_URL}/stock?codes=${codes.join(",")}`);
+    if (!res.ok) throw new Error(`Worker 响应异常：${res.status}`);
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
 
-/**
- * 印花税 = 金额 × 0.00005，四舍五入保留2位（仅启用时）
- */
-function calcStampTax(amount, ns) {
-  if (!stamp[ns]) return 0;
-  return Math.round(amount * STAMP_RATE * 100) / 100;
-}
+    clearStatus();
+    json.stocks.forEach((stock, idx) => renderCard(stock, idx));
 
-/**
- * 二分法求止盈价
- * 目标：卖出金额 - 买入金额 - 买入佣金 - 卖出佣金 - 印花税 = targetNet
- */
-function solveTpPrice(buyPrice, qty, type, buyCom, targetNet) {
-  const buyAmt = buyPrice * qty;
+    const cachedCount = json.stocks.filter(s => s.cached).length;
+    if (cachedCount) showStatus(`${cachedCount} 只来自缓存，其余为实时数据`);
 
-  function netAt(p) {
-    const sellAmt = p * qty;
-    const sc = calcComm(sellAmt, type);
-    const st = calcStampTax(sellAmt, 'tp');
-    return sellAmt - buyAmt - buyCom - sc - st;
+  } catch (err) {
+    showStatus(err.message || "请求失败，请检查网络或 Worker 配置", "err");
   }
 
-  // 确定上界（一直扩大直到净盈利超过目标）
-  let lo = buyPrice;
-  let hi = buyPrice + (Math.abs(targetNet) + buyCom + MIN_COMM * 2 + 1) / qty * 2 + 0.01;
-  let safety = 0;
-  while (netAt(hi) < targetNet && safety++ < 100) hi *= 2;
+  btnQuery.disabled = codes.length === 0;
+});
 
-  // 二分收敛
-  for (let i = 0; i < 300; i++) {
-    const mid = (lo + hi) / 2;
-    const net = netAt(mid);
-    if (Math.abs(net - targetNet) < 0.00001) return mid;
-    if (net < targetNet) lo = mid;
-    else                 hi = mid;
-  }
-  return (lo + hi) / 2;
-}
+// ── 渲染单张图表卡片 ──────────────────────────────────────
+function renderCard(stock, idx) {
+  const card = document.createElement("div");
+  card.className = "chart-card";
+  card.style.animationDelay = `${idx * 0.08}s`;
 
-// ──────────────────────────────────────────────────
-//  模式A：止盈止损价计算
-// ──────────────────────────────────────────────────
-function calcTP() {
-  clearErr('tp');
-
-  const buyPrice     = parseFloat(document.getElementById('tp_buyPrice').value);
-  const buyQty       = parseInt(document.getElementById('tp_buyQty').value);
-  const type         = document.getElementById('tp_tradeType').value;
-  const targetProfit = parseFloat(document.getElementById('tp_targetProfit').value);
-  const targetLoss   = parseFloat(document.getElementById('tp_targetLoss').value);
-
-  if (isNaN(buyPrice) || buyPrice <= 0) return showErr('tp', '请输入有效的买入价格');
-  if (isNaN(buyQty)   || buyQty   <= 0) return showErr('tp', '请输入有效的买入数量');
-  if (isNaN(targetProfit) || targetProfit < 0) return showErr('tp', '止盈目标不能为负数');
-  if (isNaN(targetLoss)   || targetLoss   < 0) return showErr('tp', '止损目标不能为负数');
-
-  // 买入
-  const buyAmt  = buyPrice * buyQty;
-  const buyCom  = calcComm(buyAmt, type);
-  const buyCost = buyAmt + buyCom;
-
-  // 止盈价（二分）
-  const tpPrice   = solveTpPrice(buyPrice, buyQty, type, buyCom, targetProfit);
-  const tpSellAmt = tpPrice * buyQty;
-  const tpSellCom = calcComm(tpSellAmt, type);
-  const tpStamp   = calcStampTax(tpSellAmt, 'tp');
-  const tpNet     = tpSellAmt - buyAmt - buyCom - tpSellCom - tpStamp;
-  const tpPct     = (tpPrice - buyPrice) / buyPrice * 100;
-
-  // 止损价（纯价差，不含手续费）
-  const slPrice = buyPrice - targetLoss / buyQty;
-  const slPct   = (slPrice - buyPrice) / buyPrice * 100;
-
-  // 盈亏比
-  const tpTotalFee = buyCom + tpSellCom + tpStamp;
-  const rr = targetLoss > 0 ? targetProfit / targetLoss : null;
-
-  // 渲染
-  set('tp_r_buyAmt',  fmtY(buyAmt));
-  set('tp_r_buyCom',  fmtY(buyCom));
-  set('tp_r_buyCost', fmtY(buyCost));
-
-  set('tp_r_tpPrice', tpPrice.toFixed(3));
-  set('tp_r_tpMeta',  '净盈利 ' + fmtY(tpNet));
-  set('tp_r_tpPct',   '+' + tpPct.toFixed(2) + '%');
-
-  set('tp_r_slPrice', slPrice.toFixed(3));
-  set('tp_r_slMeta',  '毛亏损 -' + fmtY(targetLoss));
-  set('tp_r_slPct',   slPct.toFixed(2) + '%');
-
-  if (rr !== null) {
-    set('tp_r_rr',       rr.toFixed(2) + ' : 1');
-    set('tp_r_rrDetail', '止盈 ¥' + targetProfit.toFixed(0) + ' 净 / 止损 ¥' + targetLoss.toFixed(0) + ' 毛');
+  if (stock.error) {
+    card.innerHTML = `
+      <div class="chart-header">
+        <div><div class="stock-name">${stock.code}</div></div>
+      </div>
+      <div class="chart-error">⚠ ${stock.error}</div>`;
+    chartsDiv.appendChild(card);
+    return;
   }
 
-  // 手续费明细表
-  renderFeeTable('tp_feeBody', [
-    ['sec', '买入费用'],
-    ['row', '买入金额',                                    fmtY(buyAmt)],
-    ['row', '买入佣金（' + rateLabel(type) + '，最低5元）', fmtY(buyCom)],
-    ['sec', '止盈时卖出费用'],
-    ['row', '卖出金额（按止盈价）',                         fmtY(tpSellAmt)],
-    ['row', '卖出佣金',                                    fmtY(tpSellCom)],
-    ['row', stamp.tp ? '印花税（万0.5，四舍五入）' : '印花税', stamp.tp ? fmtY(tpStamp) : null],
-    ['tot', '止盈全程总手续费',                             fmtY(tpTotalFee)],
-  ]);
+  const list = stock.list || [];
+  if (!list.length) {
+    card.innerHTML = `
+      <div class="chart-header">
+        <div>
+          <div class="stock-name">${stock.name}</div>
+          <div class="stock-code">${stock.code}</div>
+        </div>
+      </div>
+      <div class="chart-error">暂无数据</div>`;
+    chartsDiv.appendChild(card);
+    return;
+  }
 
-  showPanel('tp_results');
-}
+  const last = list[list.length - 1];
+  const pct  = parseFloat(last.changepct ?? 0);
+  const badgeClass = pct > 0 ? "badge-red" : pct < 0 ? "badge-green" : "badge-dim";
+  const badgeText  = pct > 0 ? `+${pct.toFixed(2)}%` : `${pct.toFixed(2)}%`;
+  const dateRange  = `${list[0].date.slice(5)} ~ ${last.date.slice(5)}`;
+  const canvasId   = `chart-${stock.code}`;
 
-// ──────────────────────────────────────────────────
-//  模式B：盈亏计算
-// ──────────────────────────────────────────────────
-function calcPNL() {
-  clearErr('pnl');
+  card.innerHTML = `
+    <div class="chart-header">
+      <div>
+        <div class="stock-name">${stock.name}</div>
+        <div class="stock-code">${stock.code}</div>
+      </div>
+      <div class="badge-row">
+        <span class="badge badge-dim">${dateRange}</span>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <button class="toggle-btn active-max"   data-key="max"   data-code="${stock.code}">最高价</button>
+      <button class="toggle-btn active-min"   data-key="min"   data-code="${stock.code}">最低价</button>
+      <button class="toggle-btn active-close" data-key="close" data-code="${stock.code}">收盘价</button>
+    </div>
+    <div class="chart-wrap"><canvas id="${canvasId}"></canvas></div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#f06464"></div>最高价</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4fcf8a"></div>最低价</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#5b9cf6"></div>收盘价</div>
+    </div>
+    ${buildTableHTML(list, stock.code)}`;
 
-  const buyPrice = parseFloat(document.getElementById('pnl_buyPrice').value);
-  const qty      = parseInt(document.getElementById('pnl_qty').value);
-  const curPrice = parseFloat(document.getElementById('pnl_curPrice').value);
-  const type     = document.getElementById('pnl_tradeType').value;
+  chartsDiv.appendChild(card);
 
-  if (isNaN(buyPrice) || buyPrice <= 0) return showErr('pnl', '请输入有效的买入价格');
-  if (isNaN(qty)      || qty      <= 0) return showErr('pnl', '请输入有效的持仓数量');
-  if (isNaN(curPrice) || curPrice <= 0) return showErr('pnl', '请输入有效的当前价格');
+  // 图表
+  const labels    = list.map(d => d.date.slice(5));
+  const maxData   = list.map(d => parseFloat(d.max));
+  const minData   = list.map(d => parseFloat(d.min));
+  const closeData = list.map(d => parseFloat(d.close));
 
-  const buyAmt   = buyPrice * qty;
-  const buyCom   = calcComm(buyAmt, type);
-  const buyCost  = buyAmt + buyCom;
+  const rangeFillPlugin = {
+    id: "rangeFill",
+    beforeDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const meta0 = chart.getDatasetMeta(0);
+      const meta1 = chart.getDatasetMeta(1);
+      if (!meta0.visible || !meta1.visible) return;
+      ctx.save();
+      ctx.beginPath();
+      meta0.data.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      [...meta1.data].reverse().forEach(pt => ctx.lineTo(pt.x, pt.y));
+      ctx.closePath();
+      ctx.fillStyle = "rgba(232,184,75,0.07)";
+      ctx.fill();
+      ctx.restore();
+    }
+  };
 
-  const curVal   = curPrice * qty;
-  const sellCom  = calcComm(curVal, type);
-  const stmpTax  = calcStampTax(curVal, 'pnl');
-  const totalFee = buyCom + sellCom + stmpTax;
-
-  const rawPnl   = curVal - buyAmt;                              // 价差毛盈亏
-  const netPnl   = curVal - buyAmt - buyCom - sellCom - stmpTax; // 净盈亏
-  const rawPct   = rawPnl / buyAmt * 100;
-  const netPct   = netPnl / buyCost * 100;
-
-  // 大数字区块
-  const state = netPnl > 0 ? 'profit-state' : netPnl < 0 ? 'loss-state' : 'neutral-state';
-  document.getElementById('pnl_display').className = 'pnl-display ' + state;
-  set('pnl_sign',   netPnl > 0 ? '▲ 净盈利' : netPnl < 0 ? '▼ 净亏损' : '持平');
-  set('pnl_amount', (netPnl >= 0 ? '+' : '') + fmtY(netPnl));
-  set('pnl_sub',    '扣除买入佣金 + 卖出佣金' + (stamp.pnl ? ' + 印花税' : ''));
-
-  // 明细
-  set('pnl_r_buyAmt',   fmtY(buyAmt));
-  set('pnl_r_buyCom',   fmtY(buyCom));
-  set('pnl_r_buyCost',  fmtY(buyCost));
-  set('pnl_r_curVal',   fmtY(curVal));
-  set('pnl_r_sellCom',  fmtY(sellCom));
-  set('pnl_r_stamp',    stamp.pnl ? fmtY(stmpTax) : '未启用');
-  set('pnl_r_totalFee', fmtY(totalFee));
-
-  // 盈亏卡着色
-  const rawCardClass = rawPnl > 0 ? 'profit' : rawPnl < 0 ? 'loss' : 'neutral';
-  const netCardClass = netPnl > 0 ? 'profit' : netPnl < 0 ? 'loss' : 'neutral';
-  document.getElementById('pnl_rawCard').className = 'result-card ' + rawCardClass;
-  document.getElementById('pnl_netCard').className = 'result-card ' + netCardClass;
-
-  set('pnl_r_rawPnl', (rawPnl >= 0 ? '+' : '') + fmtY(rawPnl));
-  set('pnl_r_rawPct', fmtPct(rawPct));
-  set('pnl_r_netPnl', (netPnl >= 0 ? '+' : '') + fmtY(netPnl));
-  set('pnl_r_netPct', fmtPct(netPct));
-
-  showPanel('pnl_results');
-}
-
-// ──────────────────────────────────────────────────
-//  工具函数
-// ──────────────────────────────────────────────────
-function set(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = val;
-}
-
-function fmtY(n)    { return '¥' + n.toFixed(2); }
-function fmtPct(n)  { return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
-function rateLabel(t){ return t === 'etf' ? '万0.5' : '万0.854'; }
-
-function showErr(ns, msg) {
-  const el = document.getElementById(ns + '_errorMsg');
-  el.textContent = '⚠ ' + msg;
-  el.classList.add('show');
-}
-function clearErr(ns) {
-  document.getElementById(ns + '_errorMsg').classList.remove('show');
-}
-
-function showPanel(id) {
-  const el = document.getElementById(id);
-  el.classList.remove('show');
-  void el.offsetWidth;
-  el.classList.add('show');
-}
-
-function renderFeeTable(tbodyId, rows) {
-  let html = '';
-  rows.forEach(r => {
-    if (r[0] === 'sec') {
-      html += `<tr class="fee-section-head"><td colspan="2">${r[1]}</td></tr>`;
-    } else if (r[0] === 'tot') {
-      html += `<tr class="fee-total"><td>${r[1]}</td><td>${r[2]}</td></tr>`;
-    } else {
-      const isNA = r[2] === null;
-      html += `<tr><td>${r[1]}</td><td class="${isNA ? 'fee-na' : ''}">${isNA ? '未启用' : r[2]}</td></tr>`;
+  const ctx = document.getElementById(canvasId).getContext("2d");
+  const instance = new Chart(ctx, {
+    type: "line",
+    plugins: [rangeFillPlugin],
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "最高价", data: maxData,
+          borderColor: "#f06464", backgroundColor: "rgba(240,100,100,0.06)",
+          borderWidth: 2, pointRadius: 5, pointHoverRadius: 7,
+          pointBackgroundColor: "#f06464", tension: 0.35,
+        },
+        {
+          label: "最低价", data: minData,
+          borderColor: "#4fcf8a", backgroundColor: "rgba(79,207,138,0.06)",
+          borderWidth: 2, pointRadius: 5, pointHoverRadius: 7,
+          pointBackgroundColor: "#4fcf8a", tension: 0.35,
+        },
+        {
+          label: "收盘价", data: closeData,
+          borderColor: "#5b9cf6", backgroundColor: "transparent",
+          borderWidth: 1.5, borderDash: [4, 3],
+          pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: "#5b9cf6", tension: 0.35,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1e2230",
+          borderColor: "#252a38", borderWidth: 1,
+          titleColor: "#9198ae", bodyColor: "#e2e6f0",
+          padding: 12,
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}：¥${ctx.parsed.y.toFixed(2)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: "rgba(37,42,56,0.8)" },
+          ticks: { color: "#6b738a", font: { family: "'JetBrains Mono'", size: 11 } },
+        },
+        y: {
+          grid: { color: "rgba(37,42,56,0.8)" },
+          ticks: {
+            color: "#6b738a",
+            font: { family: "'JetBrains Mono'", size: 11 },
+            callback: v => `¥${v.toFixed(2)}`,
+          },
+        }
+      }
     }
   });
-  document.getElementById(tbodyId).innerHTML = html;
+
+  chartInstances[stock.code] = { instance, visible: { max: true, min: true, close: true } };
+
+  // 折线开关
+  const keyIndex = { max: 0, min: 1, close: 2 };
+  const keyClass = { max: "active-max", min: "active-min", close: "active-close" };
+  card.querySelectorAll(".toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      const state = chartInstances[stock.code];
+      state.visible[key] = !state.visible[key];
+      state.instance.data.datasets[keyIndex[key]].hidden = !state.visible[key];
+      state.instance.update();
+      btn.classList.toggle(keyClass[key], state.visible[key]);
+    });
+  });
+
+
+}
+
+// ── 构建表格 HTML ─────────────────────────────────────────
+function buildTableHTML(list, code) {
+  // 找区间内最高/最低收盘价，用于高亮
+  const closePrices = list.map(d => parseFloat(d.close));
+  const maxClose = Math.max(...closePrices);
+  const minClose = Math.min(...closePrices);
+
+  // 表格行：最新在最上（倒序）
+  const rows = [...list].reverse().map((d, i) => {
+    const isLatest = i === 0;
+    const pct = parseFloat(d.changepct ?? 0);
+    const pctClass = pct > 0 ? "td-pct-up" : pct < 0 ? "td-pct-dn" : "td-pct-flat";
+    const pctText  = pct > 0 ? `▲ ${pct.toFixed(2)}%` : pct < 0 ? `▼ ${Math.abs(pct).toFixed(2)}%` : `— ${pct.toFixed(2)}%`;
+
+    const closeVal = parseFloat(d.close);
+    let closeExtra = "";
+    if (closeVal === maxClose && list.length > 1) closeExtra = ' title="区间最高收盘"';
+    if (closeVal === minClose && list.length > 1) closeExtra = ' title="区间最低收盘"';
+
+    // 成交量格式化（万手 / 亿手）
+    const volRaw = parseFloat(d.volume ?? d.vol ?? 0);
+    let volText = "—";
+    if (volRaw > 0) {
+      if (volRaw >= 1e8) volText = (volRaw / 1e8).toFixed(2) + " 亿";
+      else volText = (volRaw / 1e4).toFixed(0) + " 万";
+    }
+
+    // 振幅
+    const ampRaw = parseFloat(d.amplitude ?? d.zhenfu ?? 0);
+    const ampText = ampRaw ? ampRaw.toFixed(2) + "%" : "—";
+
+    return `
+      <tr class="${isLatest ? "latest" : ""}">
+        <td>${d.date.slice(5)}</td>
+        <td class="td-max">¥${parseFloat(d.max).toFixed(2)}</td>
+        <td class="td-min">¥${parseFloat(d.min).toFixed(2)}</td>
+        <td class="td-close"${closeExtra}>¥${closeVal.toFixed(2)}</td>
+        <td>${d.open ? "¥" + parseFloat(d.open).toFixed(2) : "—"}</td>
+        <td class="${pctClass}">${pctText}</td>
+        <td class="td-vol">${volText}</td>
+      </tr>`;
+  }).join("");
+
+  return `
+    <div class="table-section">
+      <div class="table-section-label">数据明细</div>
+      <div class="table-wrap">
+        <table class="price-table">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>最高价</th>
+              <th>最低价</th>
+              <th>收盘价</th>
+              <th>开盘价</th>
+              <th>涨跌幅</th>
+              <th>成交量</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="table-pad"></div>
+      </div>
+    </div>`;
 }
 </script>
 </body>
